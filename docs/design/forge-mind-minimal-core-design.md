@@ -1,9 +1,11 @@
 # ForgeMind Minimal Core Design — Phase 1
 
-**Status:** Draft — For Discussion
+**Status:** Ready for Review
 **Phase:** 1 (Minimal Closed-Loop Prototype)
 **Date:** 2026-05-19
 **Author:** GitHub Repository Editor Agent v2
+
+> This document is now ready for review and feedback before any implementation begins.
 
 ## 1. Goals
 
