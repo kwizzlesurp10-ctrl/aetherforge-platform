@@ -5,13 +5,14 @@
 **Date:** 2026-05-19
 **Author:** GitHub Repository Editor Agent v2
 
-> This document is now ready for review and feedback before any implementation begins.
+> This document defines the smallest viable autonomous loop for ForgeMind. It has been updated with modern agent architecture pattern recommendations (hybrid OODA + ReAct, layered memory guidance).
 
 ## 1. Goals
 
 Build the **smallest possible reliable autonomous loop** that can:
 - Continuously observe the state of the repository and project
-- Generate plans using an OODA-style cycle
+- Generate plans using a **hybrid OODA + ReAct** style cycle
+- Maintain basic layered memory for decisions and learnings
 - Log every decision with full provenance
 - Operate in a **completely safe dry-run mode** (no modifications)
 
@@ -23,98 +24,135 @@ This becomes the foundation for all future autonomous capabilities.
 2. **Auditability** — Every observation, decision, and plan must be logged with timestamps, reasoning, and confidence scores.
 3. **Minimal Scope** — No code generation, no PR creation, no external actions in Phase 1.
 4. **Observability** — Structured logging + basic cost estimation from day one.
-5. **Extensibility** — Design memory and planning interfaces so they can evolve.
+5. **Extensibility** — Design interfaces so memory, planning, and orchestration can evolve toward hybrid patterns and sub-agent swarms.
 
-## 3. High-Level Architecture (Phase 1)
+## 3. Recommended Architecture Patterns (Phase 1+)
+
+Based on current agentic AI research and patterns (2025–2026):
+
+- **Primary Cognitive Loop**: Hybrid **OODA + ReAct**
+  - OODA provides structured, military-grade decision making under uncertainty.
+  - ReAct adds practical reasoning + tool use + observation iteration.
+- **Memory Strategy**: Start simple but architected to evolve into **layered hybrid memory** (Working + Episodic + future Semantic).
+- **Orchestration Approach**: Begin with a clean loop. Future phases should evaluate **graph-based state machines** (for controllability, branching, and human-in-the-loop) or **orchestrator-worker** patterns.
+- **Self-Improvement Support**: Include lightweight reflection to lay groundwork for future self-mutation capabilities.
+
+**Recommended Evolution Path**:
+Simple reliable loop (Phase 1) → Graph-based or Orchestrator-Worker (Phase 4+) → Governed sub-agent swarm (Phase 5+)
+
+## 4. High-Level Architecture (Phase 1)
 
 ```
-ForgeMind Core
-├── Observer          # Reads repo state, issues, metrics
-├── Memory Bank       # Simple persistent storage (start with JSON + optional vector)
-├── Planner (OODA)    # Observe → Orient → Decide → Act (plan only)
-├── Logger            # Structured decision + cost logging
-└── Dry-Run Executor  # Simulates actions, never executes
+ForgeMind Core (Dry-Run Mode)
+├── Observer
+│   └── Gathers repo state, issues, roadmap, design docs
+├── Memory Bank (Minimal Layered)
+│   ├── Working Memory (current task/context)
+│   └── Episodic Store (past decisions + outcomes)
+├── Planner (Hybrid OODA + ReAct)
+│   ├── Observe → Orient (critique with memory)
+│   ├── Decide (ranked plans + confidence)
+│   ├── Act (Plan Only)
+│   └── Reflect (lightweight self-evaluation)
+├── Logger + Cost Tracker
+│   └── Full provenance + token/cost estimation
+└── Dry-Run Executor
+    └── Simulates actions — never mutates anything
 ```
 
-## 4. Component Breakdown
+## 5. Component Breakdown
 
-### 4.1 Observer
-- Primary responsibility: Gather current state
-- Sources (Phase 1):
-  - Repository file tree (via GitHub tools)
-  - Open issues and roadmap
-  - Basic code analysis (future)
-- Output: Structured context snapshot
+### 5.1 Observer
+- Primary responsibility: Gather current project and repository state
+- Sources in Phase 1:
+  - Repository file structure and key files (via GitHub tools)
+  - Open issues, ROADMAP, and design documents
+  - Basic metadata and context
+- Output: Structured context snapshot to feed the Planner
 
-### 4.2 Evolutionary Memory Bank (Minimal)
-- Start simple: File-based JSON store + optional local vector (Chroma or similar)
-- Stores:
-  - Past decisions and outcomes
-  - Plans and their evaluations
-  - Lessons learned
-- Must support basic retrieval for planning
+### 5.2 Evolutionary Memory Bank (Minimal — Phase 1)
+**Design Philosophy**: Keep it simple and auditable today, while designing for evolution into a powerful hybrid memory system.
 
-### 4.3 OODA Planning Engine
-- **Observe**: Pull latest context from Observer + Memory
-- **Orient**: Critique current state vs goals (using prompts + memory)
-- **Decide**: Generate ranked plans with risk/ROI scoring
-- **Act (Plan Only)**: Output a detailed action plan (never execute in Phase 1)
+**Phase 1 Approach**:
+- Structured JSON storage + Pydantic models
+- **Working Memory**: Current task state and context
+- **Episodic Memory**: History of decisions, plans, and outcomes
+- Basic retrieval to support planning
 
-### 4.4 Logging & Cost Tracking
-- Every cycle must produce structured logs
+**Future Direction** (Phase 2+):
+- Add vector embeddings for semantic retrieval
+- Introduce lightweight graph relationships
+- Support memory consolidation, decay, and higher-quality retrieval
+
+### 5.3 Planner — Hybrid OODA + ReAct Style
+- **Observe**: Pull latest context from Observer + Memory Bank
+- **Orient**: Critique current state against goals using memory and prompts
+- **Decide**: Generate ranked plans with risk/ROI scoring and confidence levels
+- **Act (Plan Only)**: Produce a detailed, reviewable action plan (never execute in Phase 1)
+- **Reflect** (lightweight): Quick self-evaluation of plan quality and reasoning before finalizing
+
+This hybrid approach combines the structured decision-making of OODA with the practical iteration of ReAct while remaining fully safe.
+
+### 5.4 Logging & Cost Tracking
+- Every cycle must produce structured, human- and machine-readable logs
 - Include estimated token usage and rough cost
-- Foundation for future budgeting and runaway prevention
+- Establishes the foundation for future cost control, budgeting, and governance layers
 
-## 5. Safety & Dry-Run Mode
+## 6. Safety & Dry-Run Mode
 
-- **Default Mode**: Dry-run only
-- All "Act" steps generate plans but do **not** call any mutating tools
-- Future execution layer will sit behind explicit human approval gates
-- Clear visual/CLI indication that the agent is in simulation mode
+- **Default Mode**: Dry-run / simulation only
+- Planning components generate plans but **never** invoke mutating tools or actions
+- All future execution capabilities will be gated behind explicit human approval
+- Logs and outputs must clearly indicate simulation mode
+- Every decision must remain reviewable by humans
 
-## 6. Technology Choices (Initial)
+## 7. Technology Choices (Initial)
 
-| Component          | Recommended Starting Choice      | Rationale |
-|--------------------|----------------------------------|---------|
-| Language           | Python 3.11+                     | Strong agent ecosystem, aligns with FastAPI vision |
-| Orchestration      | Simple `while True` loop + asyncio | Minimal dependencies |
-| Memory             | JSON files + pydantic models     | Simple, auditable, easy to evolve |
-| Vector (optional)  | Chroma (local) or pgvector       | Easy local start |
-| GitHub Integration | Existing MCP / GitHub tools      | Already connected |
-| Logging            | structlog or rich + JSON         | Structured and human readable |
+| Component                  | Phase 1 Recommendation              | Rationale & Future Notes |
+|----------------------------|-------------------------------------|--------------------------|
+| Language                   | Python 3.11+                        | Strong ecosystem for agents |
+| Orchestration (Phase 1)    | Simple loop + asyncio               | Minimal dependencies, fast iteration |
+| Future Orchestration       | Graph-based state machines          | Better control, branching, human-in-the-loop, auditability |
+| Memory (Phase 1)           | JSON + Pydantic models              | Simple, fully auditable |
+| Memory Evolution           | Hybrid Vector + Graph               | Semantic retrieval + relational knowledge |
+| GitHub Integration         | Existing MCP / GitHub tools         | Already available |
+| Logging                    | structlog / rich + JSON             | Structured + human readable |
 
-## 7. Risks & Mitigations
+## 8. Risks & Mitigations
 
-| Risk                        | Mitigation |
-|-----------------------------|----------|
-| Scope creep                 | Strict Phase 1 definition + narrow vertical slice |
-| Over-engineering memory     | Start with JSON, evolve later |
-| Hallucinated plans          | Require structured output + confidence scoring |
-| Cost explosion              | Logging + future budgeting layer |
+| Risk                              | Mitigation |
+|-----------------------------------|----------|
+| Scope creep                       | Strict Phase 1 boundaries + narrow vertical slice |
+| Over-engineering memory early     | Start minimal (JSON), evolve deliberately with clear interfaces |
+| Low-quality or hallucinated plans | Structured output + confidence scoring + lightweight reflection step |
+| Future difficulty evolving design | Design clean interfaces and extension points from the start |
+| Cost/token issues                 | Early logging + planned budgeting layer |
 
-## 8. Success Criteria for Phase 1
+## 9. Success Criteria for Phase 1
 
-- [ ] Agent runs in a continuous loop without crashing
-- [ ] Produces auditable decision logs every cycle
-- [ ] Generates plans that reference current issues/roadmap
-- [ ] Clearly operates in dry-run mode
-- [ ] Easy to review logs and understand reasoning
+- [ ] Agent runs continuously in a stable loop
+- [ ] Produces clear, auditable decision logs every cycle
+- [ ] Uses basic memory to inform planning
+- [ ] Generates plans referencing current issues/roadmap
+- [ ] Operates fully in dry-run mode with zero side effects
+- [ ] Reasoning is easy for humans to review and understand
 
-## 9. Out of Scope (Phase 1)
+## 10. Out of Scope (Phase 1)
 
-- Any code modification
-- PR creation
-- Sub-agent spawning
+- Any code changes or PR creation
+- Sub-agent spawning or swarm behavior
 - Real execution of plans
-- Self-improvement of the agent
+- Advanced self-mutation capabilities
+- Production vector or graph memory systems
 
-## 10. Next Steps After Phase 1
+## 11. Next Steps After Phase 1
 
-- Stabilize core loop
-- Add human approval UI/gates
-- Expand memory sophistication
-- Move to Phase 2 safety hardening
+- Stabilize the hybrid OODA + ReAct loop with basic layered memory
+- Introduce stronger human approval gates and provenance
+- Evolve memory toward hybrid vector + graph capabilities
+- Explore graph-based orchestration primitives for better controllability
+- Proceed to Phase 2 safety hardening
 
 ---
 
-*This is a living design document. Feedback welcome.*
+*Living document. Updated with architecture pattern research (hybrid OODA+ReAct, layered memory, evolution path). Feedback welcome.*
